@@ -1,7 +1,7 @@
 import useAppStore from '../../store/appStore';
 import { formatCurrency } from '../../utils/helpers';
 import { useMemo, useState } from 'react';
-import { Target, TrendingUp, TrendingDown, Wallet, Edit3 } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wallet, Edit3, Check } from 'lucide-react';
 
 export default function BudgetTracker() {
   const { transactions, monthlyBudget, setMonthlyBudget } = useAppStore();
@@ -10,16 +10,19 @@ export default function BudgetTracker() {
 
   const stats = useMemo(() => {
     const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
     const thisMonth = transactions.filter(t => {
       const d = new Date(t.date);
-      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
     });
     const income = thisMonth.filter(t => t.type === 'credit').reduce((s, t) => s + t.amount, 0);
     const expenses = thisMonth.filter(t => t.type === 'debit').reduce((s, t) => s + t.amount, 0);
     const savings = income - expenses;
-    const budgetUsage = monthlyBudget > 0 ? Math.min((expenses / monthlyBudget) * 100, 150) : 0;
+    const budgetUsage = monthlyBudget > 0 ? Math.min((expenses / monthlyBudget) * 100, 200) : 0;
+    const remaining = monthlyBudget - expenses;
     const isOverBudget = expenses > monthlyBudget;
-    return { income, expenses, savings, budgetUsage, isOverBudget };
+    return { income, expenses, savings, budgetUsage, remaining, isOverBudget };
   }, [transactions, monthlyBudget]);
 
   const handleSave = () => {
@@ -27,77 +30,88 @@ export default function BudgetTracker() {
     setEditing(false);
   };
 
+  const progressWidth = Math.min(stats.budgetUsage, 100);
+  const progressColor = stats.budgetUsage > 90
+    ? 'linear-gradient(90deg, #ef4444, #f97316)'
+    : stats.budgetUsage > 70
+      ? 'linear-gradient(90deg, #eab308, #f97316)'
+      : 'linear-gradient(90deg, #22c55e, #06b6d4)';
+
   return (
-    <div className="card p-6">
-      <div className="flex items-center justify-between mb-5">
-        <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Budget Tracker</h3>
+    <div className="card-static" style={{ padding: 28, display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+        <div>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>Budget Tracker</h3>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Monthly spending limit</p>
+        </div>
         <button onClick={() => { setEditing(!editing); setTempBudget(monthlyBudget); }}
-          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border-none cursor-pointer"
-          style={{ background: 'var(--bg-card-hover)', color: 'var(--text-secondary)' }}>
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px',
+            borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+            background: 'var(--bg-card-hover)', color: 'var(--text-secondary)',
+            fontFamily: 'var(--font-sans)',
+          }}>
           <Edit3 size={12} /> Set Budget
         </button>
       </div>
 
       {editing && (
-        <div className="flex gap-2 mb-4 animate-fade-in">
-          <input type="number" className="input-field flex-1" value={tempBudget} onChange={e => setTempBudget(e.target.value)} placeholder="Monthly budget" />
-          <button onClick={handleSave} className="btn-primary px-4">Save</button>
+        <div className="animate-fade-in" style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+          <input type="number" className="input-field" value={tempBudget}
+            onChange={e => setTempBudget(e.target.value)} placeholder="Monthly budget" style={{ flex: 1 }} />
+          <button onClick={handleSave} className="btn-primary" style={{ padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Check size={14} /> Save
+          </button>
         </div>
       )}
 
-      {/* Budget Progress */}
-      <div className="mb-5">
-        <div className="flex justify-between text-sm mb-2">
-          <span style={{ color: 'var(--text-secondary)' }}>Budget Usage</span>
-          <span className="font-semibold" style={{ color: stats.isOverBudget ? '#ef4444' : '#22c55e' }}>
+      {/* Progress Bar */}
+      <div style={{ marginBottom: 24, flex: 1 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+          <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 500 }}>Budget Usage</span>
+          <span style={{ fontSize: 20, fontWeight: 800, color: stats.isOverBudget ? '#ef4444' : '#22c55e', letterSpacing: '-0.02em' }}>
             {stats.budgetUsage.toFixed(0)}%
           </span>
         </div>
-        <div className="w-full h-3 rounded-full overflow-hidden" style={{ background: 'var(--border-color)' }}>
-          <div
-            className="h-full rounded-full transition-all duration-1000 ease-out"
-            style={{
-              width: `${Math.min(stats.budgetUsage, 100)}%`,
-              background: stats.budgetUsage > 90
-                ? 'linear-gradient(90deg, #ef4444, #f97316)'
-                : stats.budgetUsage > 70
-                  ? 'linear-gradient(90deg, #eab308, #f97316)'
-                  : 'linear-gradient(90deg, #22c55e, #06b6d4)',
-            }}
-          ></div>
+        <div style={{ width: '100%', height: 10, borderRadius: 6, background: 'var(--border-color)', overflow: 'hidden' }}>
+          <div style={{
+            width: `${progressWidth}%`, height: '100%', borderRadius: 6,
+            background: progressColor,
+            transition: 'width 1.2s cubic-bezier(0.4, 0, 0.2, 1)',
+          }}></div>
         </div>
-        <div className="flex justify-between text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
           <span>{formatCurrency(stats.expenses)} spent</span>
           <span>of {formatCurrency(monthlyBudget)}</span>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="p-3 rounded-xl text-center" style={{ background: 'rgba(34, 197, 94, 0.08)' }}>
-          <TrendingUp size={16} className="mx-auto mb-1" style={{ color: '#22c55e' }} />
-          <p className="text-xs mb-0.5" style={{ color: 'var(--text-muted)' }}>Income</p>
-          <p className="text-sm font-bold" style={{ color: '#22c55e' }}>{formatCurrency(stats.income)}</p>
-        </div>
-        <div className="p-3 rounded-xl text-center" style={{ background: 'rgba(59, 130, 246, 0.08)' }}>
-          <TrendingDown size={16} className="mx-auto mb-1" style={{ color: '#3b82f6' }} />
-          <p className="text-xs mb-0.5" style={{ color: 'var(--text-muted)' }}>Expenses</p>
-          <p className="text-sm font-bold" style={{ color: '#3b82f6' }}>{formatCurrency(stats.expenses)}</p>
-        </div>
-        <div className="p-3 rounded-xl text-center" style={{ background: stats.savings >= 0 ? 'rgba(34, 197, 94, 0.08)' : 'rgba(239, 68, 68, 0.08)' }}>
-          <Wallet size={16} className="mx-auto mb-1" style={{ color: stats.savings >= 0 ? '#22c55e' : '#ef4444' }} />
-          <p className="text-xs mb-0.5" style={{ color: 'var(--text-muted)' }}>Savings</p>
-          <p className="text-sm font-bold" style={{ color: stats.savings >= 0 ? '#22c55e' : '#ef4444' }}>{formatCurrency(stats.savings)}</p>
-        </div>
+      {/* Stats Row */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+        {[
+          { icon: TrendingUp, label: 'Income', value: stats.income, color: '#22c55e', bg: 'rgba(34, 197, 94, 0.06)' },
+          { icon: TrendingDown, label: 'Expenses', value: stats.expenses, color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.06)' },
+          { icon: Wallet, label: stats.remaining >= 0 ? 'Remaining' : 'Over by', value: Math.abs(stats.remaining), color: stats.remaining >= 0 ? '#22c55e' : '#ef4444', bg: stats.remaining >= 0 ? 'rgba(34, 197, 94, 0.06)' : 'rgba(239, 68, 68, 0.06)' },
+        ].map((item, i) => (
+          <div key={i} style={{ padding: 14, borderRadius: 14, background: item.bg, textAlign: 'center' }}>
+            <item.icon size={16} style={{ color: item.color, margin: '0 auto 6px' }} />
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, fontWeight: 500 }}>{item.label}</p>
+            <p style={{ fontSize: 14, fontWeight: 800, color: item.color, letterSpacing: '-0.01em' }}>
+              {formatCurrency(item.value)}
+            </p>
+          </div>
+        ))}
       </div>
 
       {/* Status Badge */}
-      <div className="mt-4 flex justify-center">
-        <span className="px-4 py-1.5 rounded-full text-xs font-semibold"
-          style={{
-            background: stats.isOverBudget ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)',
-            color: stats.isOverBudget ? '#ef4444' : '#22c55e',
-          }}>
+      <div style={{ marginTop: 20, textAlign: 'center' }}>
+        <span style={{
+          display: 'inline-block', padding: '8px 20px', borderRadius: 24, fontSize: 12, fontWeight: 700,
+          background: stats.isOverBudget ? 'rgba(239, 68, 68, 0.08)' : 'rgba(34, 197, 94, 0.08)',
+          color: stats.isOverBudget ? '#ef4444' : '#22c55e',
+          border: `1px solid ${stats.isOverBudget ? 'rgba(239, 68, 68, 0.15)' : 'rgba(34, 197, 94, 0.15)'}`,
+        }}>
           {stats.isOverBudget ? '⚠️ Over Budget' : '✅ On Track'}
         </span>
       </div>
